@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">minasbate-language-learning-app</string>
+    <string name="title_activity_main">minasbate-language-learning-app</string>
+    <string name="package_name">com.MLLT.app</string>
+    <string name="custom_url_scheme">com.MLLT.app</string>
+</resources>

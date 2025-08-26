@@ -1,0 +1,144 @@
+# Minasbate Language Learning App Documentation
+
+This document provides an overview of the Minasbate Language Learning App, detailing its components, features, and data management.
+
+## 1. Core Application (`App.tsx`)
+
+The main component that orchestrates the entire application.
+
+### Responsibilities:
+
+-   **State Management**: Manages the global state, including the current page, user profile, words, quiz questions, and activity progress.
+-   **Routing**: Controls which component is displayed based on the `currentPage` state.
+-   **Data Loading**: Initializes and loads all application data from IndexedDB on startup.
+-   **Event Handling**: Implements a global click listener to play sounds on user interactions.
+-   **Data Persistence**: Saves user progress to `localStorage`.
+
+### Key Functions:
+
+-   `loadAppData()`: Initializes IndexedDB and loads all data into the application's state.
+-   `navigateTo(page)`: Changes the current view of the application.
+-   `handleUpdateProfile(profile)`: Updates the user's profile.
+-   `handleAddWord(word)`: Adds a new word to the dictionary.
+-   `handleAddQuizQuestion(category, question)`: Adds a new quiz question.
+-   `handleUpdateWord(word)`: Updates an existing word.
+-   `handleUpdateQuizQuestion(category, question)`: Updates a quiz question.
+-   `handleArchiveWords(wordIds)`: Moves words to the archives.
+-   `handleDeleteWords(wordIds)`: Permanently deletes words.
+-   `handleDeleteQuizQuestions(questionIds)`: Permanently deletes quiz questions.
+-   `handleUnarchiveWords(wordIds)`: Restores words from the archives.
+-   `handleCreateBackup()`: Creates a JSON backup of all user data.
+-   `handleRestoreBackup(fileContent)`: Restores data from a backup file.
+-   `handleClearAllData()`: Clears all user data from the application.
+
+## 2. Components
+
+### `HomeScreen.tsx`
+
+The main landing page of the application.
+
+-   **Displays**: A welcome message with the user's nickname and profile picture, a list of learning activities, and a card for navigating to the phrases section.
+-   **Functionality**: Allows users to start an activity or navigate to the phrases screen.
+
+### `DictionaryScreen.tsx`
+
+A screen for viewing, editing, and managing words and quiz questions.
+
+-   **Features**:
+    -   Toggles between a "Words" view and a "Questions" view.
+    -   Search functionality to filter words and questions.
+    -   Allows for the selection of multiple items to perform bulk actions (archive or delete).
+-   **Modals**:
+    -   `EditWordModal`: Allows editing a word's text, meaning, and audio.
+    -   `EditQuizQuestionModal`: Allows editing a quiz question's text, options, correct answer, and image.
+
+### `AddScreen.tsx`
+
+A form for adding new words or quiz questions to the application.
+
+-   **Functionality**:
+    -   A dropdown to select the category for the new entry.
+    -   Dynamically changes the form fields based on whether the selected category is for a word or a quiz.
+    -   Supports uploading images and audio files.
+
+### `PersonalScreen.tsx`
+
+Allows the user to customize their profile.
+
+-   **Features**:
+    -   Update their nickname.
+    -   Upload a profile photo.
+-   **State**: The save button is enabled only when changes have been made.
+
+### `SettingsScreen.tsx`
+
+Provides access to various application settings and information pages.
+
+-   **Navigation**: Contains buttons to navigate to:
+    -   Policy
+    -   Updates
+    -   Archives
+    -   Mission & Vision
+    -   Backup & Restore
+-   **Functionality**: Includes a "Clear All Data" button, which opens a confirmation modal before deleting all user data.
+
+### `ActivityScreen.tsx`
+
+The screen where users take quizzes.
+
+-   **Functionality**:
+    -   Displays one question at a time with multiple-choice options.
+    -   Provides immediate feedback on whether the selected answer is correct or incorrect.
+    -   Tracks and updates the user's progress for the current activity.
+    -   Allows resetting progress for the current activity.
+
+### `PhrasesScreen.tsx`
+
+Displays a list of phrase and greeting categories.
+
+-   **Functionality**: Serves as a navigation hub to different word lists based on categories like "Greetings," "Phrases," etc.
+
+### `WordListScreen.tsx`
+
+Displays a list of words for a specific category.
+
+-   **Features**:
+    -   Shows the word and its meaning.
+    -   Includes a button to play the audio pronunciation of the word, with a fallback to text-to-speech if no audio file is available.
+
+### `ArchivesScreen.tsx`
+
+Allows users to view and manage their archived words.
+
+-   **Functionality**:
+    -   Displays a list of all archived words.
+    -   Allows users to select one or more words to unarchive (restore to the main dictionary).
+
+### `BackupRestoreScreen.tsx`
+
+Provides tools for data backup and recovery.
+
+-   **Features**:
+    -   **Backup**: Allows the user to download a JSON file containing all their data (profile, words, questions, progress).
+    -   **Restore**: Allows the user to upload a backup file to restore their data. A warning is displayed as this action overwrites existing data.
+
+## 3. Data Management (`utils/db.ts`)
+
+Handles all interactions with the browser's IndexedDB.
+
+### Database Schema:
+
+-   **`words`**: Stores all the words in the dictionary.
+-   **`archived-words`**: Stores words that have been archived.
+-   **`quiz-questions`**: Stores all the quiz questions.
+-   **`user-profile`**: Stores the user's profile information.
+
+### Key Functions:
+
+-   `initDB()`: Initializes the database and handles schema upgrades.
+-   Provides a comprehensive set of `async` functions for CRUD (Create, Read, Update, Delete) operations on all data stores.
+-   Includes functions for bulk operations, such as `bulkAddWords` and `bulkAddQuizQuestions`, which are used during the initial setup and data restoration.
+-   `clearAllData()`: A utility function to completely wipe all data from the database.
+
+location of apk file:
+"C:\Users\User\Downloads\minasbate-language-learning-app (1)\android\app\build\outputs\apk\debug"
