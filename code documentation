@@ -1,0 +1,543 @@
+# System Documentation
+
+This document provides a detailed explanation of the WLLTV2 application's source code.
+
+## Table of Contents
+1. [Root Component: App.tsx](#root-component-apptsx)
+2. [Components](#components)
+3. [Utilities](#utilities)
+4. [Types and Constants](#types-and-constants)
+
+---
+
+## 1. Root Component: App.tsx
+
+`App.tsx` serves as the main entry point and central state manager for the entire React application. It is responsible for orchestrating the different views (screens), managing application-wide state, and handling data persistence.
+
+### State Management
+
+The `App` component utilizes React hooks (`useState`, `useEffect`, `useCallback`) to manage the application's state.
+
+-   **`currentPage`**: A state variable of type `Page` (enum) that determines which screen is currently visible to the user.
+-   **`currentActivity`**: Holds the category of the quiz the user is currently engaged in. It is `null` when no quiz is active.
+-   **`currentWordListCategory`**: Stores the category for the word list being viewed.
+-   **`userProfile`**: An object containing the user's `nickname` and `photo`.
+-   **`words`**: An array of `Word` objects representing the main dictionary.
+-   **`archivedWords`**: An array of `Word` objects that have been archived by the user.
+-   **`quizQuestions`**: A dictionary-like object where keys are `ActivityCategory` enums and values are arrays of `QuizQuestion` objects for that category.
+-   **`activities`**: An array that holds the state of user activities, including their progress. This state is initialized from `localStorage` to persist progress across sessions.
+
+### Data Persistence and Initialization
+
+-   **IndexedDB (`utils/db.ts`)**: The primary storage mechanism for application data, including words, archived words, quiz questions, and the user profile. This provides a robust client-side database.
+-   **`localStorage`**: Used for storing user's quiz progress and a flag (`minasbate-app-initialized`) to check if the application is being launched for the first time.
+-   **`loadAppData` function**: This function, wrapped in `useCallback`, is responsible for initializing the application's data.
+    -   **First-time Load**: If the `minasbate-app-initialized` flag is not set in `localStorage`, the app fetches initial data from a `public/Masterdatalist.json` file and populates the IndexedDB with initial words and quiz questions.
+    -   **Subsequent Loads**: On subsequent launches, it fetches all data directly from IndexedDB.
+-   **Progress Saving**: A `useEffect` hook monitors the `activities` state. Whenever it changes, the updated progress is saved to `localStorage`.
+
+### Core Functionality and Event Handlers
+
+`App.tsx` defines all the core logic for interacting with the application's data. These functions are passed down as props to child components.
+
+-   **Navigation**:
+    -   `navigateTo`: A `useCallback`-memoized function to change the `currentPage` state, effectively switching screens.
+    -   `handleBack`: Implements back-navigation logic, determining the previous screen based on the current one (e.g., from a settings sub-page back to the main settings screen).
+-   **User and Data Management**:
+    -   `handleUpdateProfile`: Saves changes to the user's profile in both the state and IndexedDB.
+    -   `handleAddWord`, `handleUpdateWord`, `handleDeleteWords`, `handleArchiveWords`, `handleUnarchiveWords`: Functions for CRUD (Create, Read, Update, Delete) operations on words.
+    -   `handleAddQuizQuestion`, `handleUpdateQuizQuestion`, `handleDeleteQuizQuestions`: Functions for managing quiz questions.
+-   **Activity and Quiz Logic**:
+    -   `handleStartActivity`, `handleStartWordList`: Set the current activity/word list category and navigate to the appropriate screen.
+    -   `handleCorrectAnswer`: Updates the progress for an activity when a user answers a question correctly.
+    -   `handleResetProgress`: Resets the progress for specified activities to 0.
+-   **Backup and Restore**:
+    -   `handleCreateBackup`: Compiles all user data from IndexedDB and `localStorage` into a single JSON file and triggers a download.
+    -   `handleRestoreBackup`: Parses a backup JSON file, clears all existing data, and repopulates the database and `localStorage` with the backup data.
+-   **Data Clearing**:
+    -   `handleClearAllData`: A function to completely wipe all application data from IndexedDB and `localStorage`, resetting the app to its initial state.
+
+### UI Rendering
+
+-   **`renderContent()` function**: This function acts as a router. It uses a `switch` statement on the `currentPage` state to determine which component to render as the main content. It passes all the necessary data and handler functions to the rendered component.
+-   **`BottomNavBar`**: The navigation bar is conditionally rendered based on the `currentPage`. It is hidden on certain screens like the quiz (`ActivityScreen`) or sub-pages to provide a more focused user experience.
+
+### Global Effects
+
+-   A `useEffect` hook adds a global click event listener to the `document`. This listener plays a sound (`SoundType.Click`) whenever a user clicks on a `<button>` or any element with a `cursor: pointer` style, providing auditory feedback. The listener is cleaned up when the component unmounts.
+
+---
+
+## 2. Components
+
+This section details the reusable React components that make up the user interface of the application.
+
+### `HomeScreen.tsx`
+
+The `HomeScreen` is the main landing page of the application. It greets the user, displays a list of available activities, and provides a navigation point to the phrases and greetings section.
+
+#### Props
+
+-   **`activities`**: An array of `Activity` objects to be displayed.
+-   **`onStartActivity`**: A callback function that is invoked when the user clicks the "start" button on an activity card. It receives the `ActivityCategory` of the selected activity.
+-   **`onNavigateToPhrases`**: A callback function to navigate the user to the `PhrasesScreen`.
+-   **`userProfile`**: A `UserProfile` object containing the user's nickname and photo to personalize the greeting.
+
+#### Sub-components
+
+-   **`UserIcon`**: A simple SVG component that displays a generic user icon. It is used as a fallback when the user has not set a profile picture.
+-   **`ActivityCard`**: A card component that represents a single activity (e.g., "Animals", "Actions").
+    -   It displays the activity's title, description, and an icon.
+    -   It features a prominent "play" button to start the activity.
+    -   A progress bar visually represents the user's completion percentage for that activity. The color of the bar and button changes from green to yellow once the activity has been started.
+-   **`PhrasesCard`**: A dedicated card for navigating to the "Phrases & Greetings" section. It is styled similarly to the `ActivityCard` but has a distinct "Go to section" button.
+
+#### Structure and Layout
+
+-   **Header**: The top section features a gradient background and displays a personalized welcome message to the user, including their name and profile picture (or the `UserIcon`).
+-   **Activities List**: The main content area lists the available activities. It maps over the `activities` prop to render an `ActivityCard` for each one.
+-   **Phrases Navigation**: Below the list of activities, a `PhrasesCard` is rendered to provide clear navigation to the phrases section.
+
+### `BottomNavBar.tsx`
+
+This component is the primary navigation tool for the application, fixed to the bottom of the screen. It provides the user with quick access to the main sections of the app.
+
+#### Props
+
+-   **`currentPage`**: A `Page` enum value that indicates the currently active screen. This is used to highlight the corresponding navigation icon.
+-   **`onNavigate`**: A callback function that is triggered when a navigation item is clicked. It passes the selected `Page` enum back to the parent component (`App.tsx`) to handle the screen change.
+
+#### Sub-components
+
+-   **`NavItem`**: A reusable button component for each item in the navigation bar.
+    -   It receives an `icon`, the `page` it represents, the `currentPage`, and the `onNavigate` callback.
+    -   It determines if it is the "active" item by comparing its `page` prop with the `currentPage` prop.
+    -   The styling (text color, background color) changes dynamically based on whether the item is active, providing clear visual feedback to the user.
+
+#### Structure and Icons
+
+-   **Layout**: The navigation bar is a `div` with a fixed position at the bottom of the viewport. It uses Flexbox to distribute the `NavItem` components evenly.
+-   **Icons**: The component maintains an `icons` object that maps each `Page` enum to its corresponding SVG icon. This keeps the icon definitions organized and easy to manage.
+-   **Navigation Items**: Five `NavItem` components are rendered, one for each main page: `Home`, `Dictionary`, `Add`, `Personal`, and `Settings`.
+
+### `DictionaryScreen.tsx`
+
+This screen serves as a comprehensive management interface for the application's content, allowing users to view, search, edit, and delete both dictionary words and quiz questions.
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+-   **`words`**: An array of all `Word` objects.
+-   **`onUpdateWord`**: Callback to save an updated word.
+-   **`onArchiveWords`**: Callback to archive a list of selected words.
+-   **`onDeleteWords`**: Callback to permanently delete selected words.
+-   **`quizQuestions`**: The complete record of all quiz questions, grouped by category.
+-   **`onUpdateQuizQuestion`**: Callback to save an updated quiz question.
+-   **`onDeleteQuizQuestions`**: Callback to permanently delete selected questions.
+
+#### State Management
+
+-   **`viewMode`**: Toggles the display between `'words'` and `'questions'`.
+-   **`editingWord`**: Holds the `Word` object currently being edited in a modal.
+-   **`editingQuestion`**: Holds the `QuizQuestion` object (and its category) being edited.
+-   **`searchTerm`**: Stores the user's input from the search bar.
+-   **`selectedWords` / `selectedQuestions`**: `Set` objects that store the IDs of items selected for bulk actions (e.g., delete, archive).
+
+#### Core Features
+
+-   **Tabbed View**: Users can switch between managing "Words" and "Questions" using a toggle button at the top.
+-   **Search Functionality**: A search bar allows users to filter the list of words or questions in real-time.
+-   **Selection Mode**: When a user long-presses (or in this implementation, clicks while in selection mode) an item, the interface enters a selection mode. This allows for bulk actions like "Archive" or "Delete".
+-   **Content Cards**:
+    -   `WordCard`: Displays a single word, its meaning, an edit button, and a button to play its pronunciation (either via an audio file or Text-to-Speech).
+    -   `QuizQuestionCard`: Displays a question's text, image, options (highlighting the correct one), and an edit button.
+-   **Editing Modals**:
+    -   `EditWordModal`: A pop-up form for editing a word's text, meaning, and associated audio file.
+    -   `EditQuizQuestionModal`: A form for editing all aspects of a quiz question, including text, image, options, and the correct answer.
+-   **Bulk Action Bar**:
+    -   `SelectionActionBar`: A bar that appears at the bottom of the screen when items are selected. It shows the number of selected items and provides buttons for bulk actions (e.g., "Archive", "Delete", "Select All").
+
+#### Event Handling
+
+-   The component defines numerous handlers for user interactions:
+    -   Filtering lists based on the `searchTerm`.
+    -   Opening and closing the edit modals.
+    -   Saving or deleting individual items from the modals.
+    -   Toggling item selection.
+    -   Executing bulk actions on the selected sets of words or questions.
+-   It uses `window.confirm` to ask for user confirmation before executing destructive actions like deletion.
+
+### `AddScreen.tsx`
+
+This screen provides a unified interface for adding new content to the application, whether it's a dictionary word or a quiz question. It dynamically changes the input form based on the selected category.
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+-   **`onAddWord`**: A function that takes the new word data (without an `id`) and adds it to the database.
+-   **`onAddQuizQuestion`**: A function that takes the new quiz question data and its category to add it to the database.
+
+#### State Management
+
+-   **`category`**: Stores the currently selected `ActivityCategory` for the new content.
+-   **`isDropdownOpen`**: A boolean to control the visibility of the category selection dropdown.
+-   **Form State**: The component maintains separate state variables for all the fields required for both words (`word`, `meaning`, `wordAudio`) and quiz questions (`question`, `options`, `correctOptionIndex`, etc.).
+-   **`image`**: A shared state for the optional image, used by both forms.
+-   **`useRef`**: `imageInputRef` and `audioInputRef` are used to programmatically trigger the file input dialogs.
+
+#### Core Features
+
+-   **Category Selection**: The user must first select a category. The component determines whether the selected category is for a quiz or a word list (`isQuizCategory`) and renders the appropriate form.
+-   **Dynamic Form Rendering**:
+    -   `renderWordForm()`: Renders a simple form with inputs for the word, its meaning, and optional audio/image uploads.
+    -   `renderQuizForm()`: Renders a more complex form for creating a quiz question, including fields for the question in both languages, four options, a way to mark the correct answer, and mandatory image/audio uploads.
+-   **File Handling**:
+    -   `handleImageChange` and `handleAudioChange` use the `FileReader` API to create a data URL from the selected file, allowing for an instant preview.
+    -   "Remove" buttons allow the user to clear a selected image or audio file.
+-   **Form Logic**:
+    -   `handleSave`: This function performs validation to ensure all required fields are filled. It then constructs the new word or question object and calls the appropriate callback (`onAddWord` or `onAddQuizQuestion`).
+    -   `resetForm`: After a successful save, this function is called to clear all input fields, making it easy to add another entry.
+
+#### UI/UX
+
+-   **Unified Interface**: By using a single screen with dynamic forms, the app provides a consistent user experience for adding different types of content.
+-   **Clear Inputs**: The forms are designed to be clear and easy to use, with distinct sections for different types of information.
+-   **Previews**: The ability to preview uploaded images and audio before saving enhances usability.
+-   **User Feedback**: The app uses `alert()` to notify the user of validation errors or successful saves.
+
+### `PersonalScreen.tsx`
+
+This screen allows users to personalize their application experience by setting a custom nickname and profile picture.
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+-   **`userProfile`**: The current `UserProfile` object, used to populate the form with existing data.
+-   **`onSaveProfile`**: A callback function that is triggered when the user saves their changes. It passes the updated `UserProfile` object back to the parent.
+
+#### State Management
+
+-   **`nickname`**: Stores the value of the nickname input field.
+-   **`photo`**: Stores the data URL of the selected profile picture for preview.
+-   **`fileInputRef`**: A `useRef` hook to access the hidden file input element.
+-   **`saveState`**: Tracks the state of the save button (`'idle'`, `'saving'`, `'success'`) to provide visual feedback.
+-   **`hasChanges`**: A boolean that becomes true if the user has made any changes to the profile, enabling the save button.
+
+#### Core Features
+
+-   **Nickname Editing**: A simple text input allows the user to change their display name.
+-   **Photo Upload**:
+    -   An "Upload a Photo" button programmatically clicks a hidden `<input type="file">`.
+    -   The `handleFileChange` function uses the `FileReader` API to read the selected image as a data URL, which is then used to display a preview.
+-   **Profile Preview**: A dedicated area shows the currently selected profile picture, or a placeholder if none is set.
+-   **Save Functionality**:
+    -   The "SAVE" button is disabled until the user makes a change.
+    -   The `handleSave` function updates the button's state to "Saving...", calls the `onSaveProfile` callback, and then briefly changes the button to "Saved!" upon success before returning to its idle state. This provides clear, asynchronous feedback.
+
+#### `useEffect` Hooks
+
+-   One `useEffect` hook tracks changes to `nickname` and `photo` to determine if the form is "dirty" (i.e., has unsaved changes) and updates the `hasChanges` state accordingly.
+-   A second `useEffect` hook syncs the component's internal state with the `userProfile` prop. This ensures that if the profile data is updated elsewhere, the changes are reflected on this screen.
+
+### `SettingsScreen.tsx`
+
+This screen acts as a central hub for various administrative and informational sections of the application.
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+-   **`onNavigate`**: A function to navigate to other pages (e.g., "Policy", "Archives").
+-   **`onClearAllData`**: A callback function that is triggered to wipe all user data from the application.
+
+#### State Management
+
+-   **`isModalOpen`**: A boolean state that controls the visibility of the `ClearDataModal`.
+
+#### Sub-components
+
+-   **`SettingsButton`**: A reusable, styled button component used for each item in the settings grid. It accepts a `label`, `color`, and an `onClick` handler.
+-   **`ClearDataModal`**: A modal component that appears to ask for user confirmation before proceeding with the "Clear All Data" action. This prevents accidental data loss.
+
+#### Structure and Layout
+
+-   **Grid Layout**: The screen uses a responsive grid to display the various settings options, such as "Policy", "Updates", "Archives", etc.
+-   **Navigation**: Each `SettingsButton` uses the `onNavigate` prop to take the user to the corresponding sub-page.
+-   **Data Deletion**: The "CLEAR ALL DATA" button is styled differently (in red) to indicate a destructive action. Clicking it opens the confirmation modal instead of navigating directly. The `handleConfirmClear` function calls the `onClearAllData` prop and closes the modal.
+
+### `ActivityScreen.tsx`
+
+This component provides the user interface for taking a quiz. It displays one question at a time and provides immediate feedback on the user's answers.
+
+#### Props
+
+-   **`category`**: The `ActivityCategory` of the current quiz.
+-   **`questions`**: An array of `QuizQuestion` objects for the current activity.
+-   **`onBack`**: A callback function to exit the activity and return to the previous screen.
+-   **`onCorrectAnswer`**: A callback that is invoked with the `category` when the user answers a question correctly. This is used to update the progress.
+-   **`onResetProgress`**: A function to reset the user's progress for the current activity.
+
+#### State Management
+
+-   **`currentQuestionIndex`**: A number that tracks the user's position within the `questions` array.
+-   **`selectedAnswer`**: Stores the option the user has selected for the current question.
+-   **`feedback`**: An object that holds feedback information (`type` and `message`) to be displayed after an answer is submitted. It is `null` when no feedback is shown.
+-   **`isSubmitted`**: A boolean that locks the UI while the feedback is being displayed, preventing the user from changing their answer.
+
+#### Core Logic
+
+-   **Question Display**: The screen displays the current question's text (in both languages), its associated image, and the multiple-choice options.
+-   **Answer Handling**:
+    -   When the user selects an option, its state is stored in `selectedAnswer`.
+    -   The `handleSubmit` function checks if the `selectedAnswer` is correct.
+    -   It provides visual and auditory feedback (correct/incorrect sounds).
+    -   After a delay (`setTimeout`), it clears the feedback and advances to the next question or ends the activity if it's the last question.
+-   **Dynamic Styling**: The `getButtonClass` function dynamically styles the answer buttons based on the state:
+    -   **Default**: Unselected buttons are gray.
+    -   **Selected**: The selected button turns blue.
+    -   **Submitted (Correct)**: The correct answer turns green.
+    -   **Submitted (Incorrect)**: The user's wrong choice turns red, and the correct answer still turns green, showing them the right option.
+-   **Progress Reset**: A reset button in the header allows the user to clear their progress for that specific activity after a confirmation prompt.
+-   **Empty State**: If no questions are available for a category, the component renders a message prompting the user to add some.
+
+### `PhrasesScreen.tsx`
+
+This screen serves as a menu for categories that are presented as simple word lists rather than quizzes (e.g., "Greetings", "Common Phrases").
+
+#### Props
+
+-   **`categories`**: An array of `Activity` objects that are of the type `wordlist`.
+-   **`onCategoryClick`**: A callback function that is triggered when a user taps on a category card. It passes the selected `ActivityCategory` to the parent.
+-   **`onBack`**: A function to navigate back to the previous screen.
+
+#### Sub-components
+
+-   **`CategoryCard`**: A large, tappable card representing a single category.
+    -   It displays the category's icon and title.
+    -   It has a distinct background color based on its `ActivityCategory`, making the menu vibrant and easy to navigate visually.
+    -   The `onClick` handler triggers the `onCategoryClick` prop.
+
+#### Structure and Layout
+
+-   The screen displays a simple vertical grid of `CategoryCard` components.
+-   It maps over the `categories` prop to render a card for each available word list category.
+
+### `WordListScreen.tsx`
+
+This screen displays a simple, scrollable list of words and their meanings for a specific category. It's designed for browsing and listening to pronunciation without the interactive quiz elements.
+
+#### Props
+
+-   **`category`**: The `ActivityCategory` to display words for.
+-   **`onBack`**: A callback function to navigate to the previous screen.
+-   **`words`**: The complete array of `Word` objects from the application's state.
+
+#### Sub-components
+
+-   **`WordCard`**: A component that displays a single word entry.
+    -   It shows the word and its meaning.
+    -   It includes a "play" button to hear the pronunciation.
+    -   **Audio Logic**: The `playAudio` function first checks if a custom `audio_path` exists. If so, it plays the audio file. If not, it uses the browser's built-in `SpeechSynthesis` API as a fallback to read the word aloud, attempting to use a Filipino voice for better pronunciation.
+    -   The `useEffect` hook in this component is crucial for managing the state of the audio playback, ensuring the play/pause icon (`isPlaying`) is always in sync with the audio element's state.
+
+#### Structure and Logic
+
+-   **Filtering**: The component first filters the global `words` array to get only the words that match the current `category`.
+-   **List Rendering**: It then maps over this filtered array (`categoryWords`) to render a `WordCard` for each word.
+-   **Layout**: The screen consists of a header with the category title and a back button, followed by the vertical list of word cards.
+
+### `ArchivesScreen.tsx`
+
+This screen provides a dedicated view for managing words that have been archived. Users can view their archived words and restore them to the main dictionary.
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+-   **`archivedWords`**: An array of `Word` objects that have been archived.
+-   **`onUnarchiveWords`**: A callback function that takes an array of word IDs to be unarchived.
+
+#### State Management
+
+-   **`selectedWords`**: A `Set` that stores the IDs of the words the user has selected for action (i.e., to unarchive).
+
+#### Sub-components
+
+-   **`SelectableWordCard`**: A simplified version of the `WordCard` designed for selection. It displays the word and its meaning and visually indicates whether it is selected.
+-   **`ActionBar`**: A reusable component that appears at the bottom of the screen when one or more items are selected. It shows the selection count and provides action buttons like "Unarchive" and "Select All".
+
+#### Core Features
+
+-   **List Display**: The screen displays a list of all words in the `archivedWords` prop. If the list is empty, it shows a "No archived words" message.
+-   **Selection Mechanism**:
+    -   Tapping a `SelectableWordCard` toggles its selection state.
+    -   The `ActionBar` provides a "Select All" button to quickly select every word in the list.
+    -   A "Cancel" (X) button on the `ActionBar` clears the current selection.
+-   **Unarchive Action**: The "Unarchive" button on the `ActionBar` triggers the `handleUnarchiveAction`, which calls the `onUnarchiveWords` prop with the array of selected word IDs and then clears the selection.
+
+### `PolicyScreen.tsx`
+
+This is a simple, static informational screen that displays the application's Privacy Policy and Terms of Service.
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+
+#### Structure and Content
+
+-   The component consists of a standard `Header` and a text content area.
+-   It is a "dummy" component in that it does not manage any state or handle complex logic.
+-   The text content clearly explains to the user that all their data is stored locally on their device and is not collected by any third party, emphasizing user privacy and data ownership.
+-   It also outlines the basic terms of use for the application.
+
+### `MissionVisionScreen.tsx`
+
+Similar to the `PolicyScreen`, this is a static informational component that displays the project's mission and vision statements.
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+
+#### Structure and Content
+
+-   The component consists of a standard `Header` and a text content area.
+-   It has no internal state or complex logic.
+-   The text content outlines the goals and aspirations of the application, focusing on language preservation, user empowerment, and cultural heritage.
+
+### `UpdatesScreen.tsx`
+
+This screen simulates a check for application updates. Since the application is a standalone web app without a backend server for version control, this feature is primarily for user interface demonstration.
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+
+#### State Management
+
+-   **`isChecking`**: A boolean that tracks whether the "update check" is in progress. This is used to disable the button and show a "Checking..." message.
+-   **`lastChecked`**: A string that displays the timestamp of the last simulated check.
+
+#### Core Features
+
+-   **Simulated Update Check**: The `handleCheckForUpdates` function uses a `setTimeout` to simulate a network request. After a delay, it updates the `lastChecked` state with the current time.
+-   **Initial Check**: A `useEffect` hook calls `handleCheckForUpdates` once when the component mounts to provide an initial status to the user.
+-   **User Feedback**: The screen always informs the user that they are "Up to Date!" and provides a button to manually trigger the check again. The button's state and text change dynamically based on the `isChecking` state.
+
+### `BackupRestoreScreen.tsx`
+
+This screen provides crucial functionality for data management, allowing users to export all their application data to a local file (backup) and import data from such a file (restore).
+
+#### Props
+
+-   **`onBack`**: A callback function to navigate to the previous screen.
+-   **`onBackup`**: A callback function, defined in `App.tsx`, that handles the logic of compiling all data into a JSON file and triggering a download.
+-   **`onRestore`**: A callback function that receives the string content of a selected backup file to process the data restoration.
+
+#### State and Refs
+
+-   **`fileInputRef`**: A `useRef` hook to programmatically access the hidden file input element used for selecting a backup file.
+
+#### Core Features
+
+-   **Backup**:
+    -   A "Create Backup" section explains the feature.
+    -   The "Download Backup File" button directly calls the `onBackup` prop, delegating the complex backup logic to the main `App` component.
+-   **Restore**:
+    -   A "Restore from Backup" section includes a prominent warning that restoring data will overwrite all existing data.
+    -   The "Select Backup File to Restore" button clicks the hidden file input.
+    -   **File Handling**: The `handleFileChange` function is triggered when the user selects a file. It uses the `FileReader` API to read the file's content as a text string.
+    -   The file content is then passed to the `onRestore` prop for the `App` component to handle the parsing, data clearing, and repopulation logic.
+-   The file input's value is reset after reading to ensure the `onChange` event fires even if the user selects the same file again.
+
+### `ClearDataModal.tsx`
+
+This is a reusable modal component designed for a single, critical purpose: to confirm a destructive action from the user. It is used in the `SettingsScreen` before clearing all application data.
+
+#### Props
+
+-   **`isOpen`**: A boolean that determines whether the modal is visible.
+-   **`onClose`**: A callback function to close the modal (e.g., when the user clicks "No" or the background overlay).
+-   **`onConfirm`**: A callback function that is executed when the user confirms the action (clicks "Yes").
+
+#### Structure and Logic
+
+-   **Conditional Rendering**: The component returns `null` if `isOpen` is false, effectively hiding it from the DOM.
+-   **Overlay**: The modal includes a semi-transparent background overlay. Clicking this overlay calls the `onClose` function, providing an intuitive way to dismiss the modal.
+-   **Event Propagation**: `e.stopPropagation()` is used on the modal's content `div` to prevent clicks inside the modal from bubbling up and triggering the `onClose` function on the overlay.
+-   **Confirmation**: The "Yes" button triggers the `onConfirm` callback, which in turn executes the data-clearing logic defined in the parent component. It also plays a "delete" sound for auditory feedback.
+
+### `Header.tsx`
+
+This is a simple, reusable component that provides a consistent header for most of the application's sub-screens.
+
+#### Props
+
+-   **`title`**: The string to be displayed as the main title of the screen.
+-   **`onBack`**: A callback function that is executed when the user clicks the back button.
+-   **`actionButton`** (optional): A `React.ReactNode` that allows a custom button or element to be placed on the right side of the header. This is used, for example, to add the "Reset Progress" button on the `ActivityScreen`.
+
+#### Structure
+
+-   The component uses Flexbox to align its items.
+-   It features a prominent, styled back button on the left.
+-   The `title` is displayed in a large, bold font.
+-   If an `actionButton` is provided, it is rendered on the right side.
+
+---
+
+## 3. Utilities
+
+This section covers the utility modules that provide core services like database management and logging.
+
+### `db.ts`
+
+This module is the heart of the application's data persistence layer. It uses the `idb` library, a lightweight wrapper around the browser's IndexedDB API, to provide a robust, promise-based interface for all database operations.
+
+#### Database Schema (`MinasbateDB`)
+
+The module defines a clear schema for the IndexedDB database, which includes four object stores:
+
+-   **`words`**: Stores the main `Word` objects. It has an index on the `category` property to allow for efficient querying of words by their category.
+-   **`archived-words`**: Stores `Word` objects that have been archived by the user.
+-   **`quiz-questions`**: Stores `QuizQuestion` objects, also indexed by `category`.
+-   **`user-profile`**: A key-value store for the user's profile information.
+
+#### Core Functions
+
+-   **`initDB()`**: This is the initialization function. It opens the database and includes an `upgrade` callback. This callback is responsible for creating the object stores and indexes if they don't exist, handling the initial setup and any future schema migrations.
+-   **CRUD Operations**: The module exports a comprehensive set of asynchronous functions for performing Create, Read, Update, and Delete (CRUD) operations on each of the object stores. Examples include:
+    -   `addWord`, `updateWord`, `getAllWords`, `deleteWords`
+    -   `saveUserProfile`, `getUserProfile`
+    -   `addQuizQuestion`, `getAllQuizQuestions`, etc.
+-   **Bulk Operations**: For efficiency, especially during initial setup or backup restoration, the module includes bulk operation functions like `bulkAddWords` and `bulkAddQuizQuestions`. These use a single database transaction to add multiple records, which is significantly faster than adding them one by one.
+-   **Transactional Integrity**: Complex operations like `archiveWords` and `unarchiveWords` are wrapped in a single transaction. This ensures that moving a word from the `words` store to the `archived-words` store is an "atomic" operation—either both the deletion and addition succeed, or the entire operation fails, preventing data inconsistency.
+-   **`clearAllData()`**: A utility function to completely wipe all data from every object store, used for the "Clear All Data" feature.
+-   **Logging**: Every function in this module is instrumented with `logger` calls to provide detailed logs in the developer console, which is invaluable for debugging data-related issues.
+
+### `logger.ts`
+
+This is a lightweight, centralized logging utility used throughout the application for debugging.
+
+-   **`APP_PREFIX`**: A constant string `[MinasbateApp]` that is prepended to all log messages. This makes it easy to filter and identify application-specific logs in the browser's developer console.
+-   **`logger` Object**: An object that wraps the standard `console` methods (`log`, `info`, `warn`, `error`). Each method in this object simply calls the corresponding `console` method but adds the `APP_PREFIX` as the first argument. This ensures all logs are consistently formatted.
+
+---
+
+## 4. Types and Constants
+
+This section describes the files that define the core data structures and constant values used throughout the application.
+
+### `types.ts`
+
+This file is central to the application's architecture, providing TypeScript definitions for all major data structures. Using a dedicated types file ensures consistency, type safety, and better developer tooling (e.g., autocompletion) across the entire codebase.
+
+-   **`Page` Enum**: Defines a set of string constants representing every navigable screen in the application. This is used by the main `App` component to manage the current view.
+-   **`ActivityCategory` Enum**: Defines the different categories for both quizzes and word lists (e.g., `Actions`, `Animals`, `Greetings`).
+-   **`Activity` Interface**: Describes the structure of an activity object as displayed on the `HomeScreen`. It includes properties like `id`, `title`, `description`, `icon`, the user's `progress`, and a `type` ('quiz' or 'wordlist').
+-   **`QuizQuestion` Interface**: Defines the shape of a single quiz question, including its `id`, `image`, `audio` path, the question text in both languages, an array of `options`, the `correctAnswer`, and the `category` it belongs to.
+-   **`Word` Interface**: Defines the structure of a dictionary word, including its `id`, the `word` itself, its `meaning`, paths for `audio` and `image` files, and its `category`.
+-   **`UserProfile` Interface**: Defines the shape of the user's profile object, containing their `nickname` and a `photo` (which can be a string URL or `null`).
+
+### `constants.ts`
+
+This file exports hardcoded data that is used to initialize or structure parts of the application.
+
+-   **`INITIAL_ACTIVITIES`**: An array of `Activity` objects that defines the default set of activities available to the user. This array is used to initialize the `activities` state in `App.tsx`. Each object specifies the category's ID, title, description, icon, and type (`quiz` or `wordlist`). The initial progress for all activities is set to 0.
